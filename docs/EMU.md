@@ -69,6 +69,8 @@ Super Mario Odyssey:
   entrance_mode: off
 ```
 
+Full keys + variants: [`sample-player.yaml`](sample-player.yaml).
+
 Generate → open the room / start hosting.
 
 ### 5. Connect Client (:1027)

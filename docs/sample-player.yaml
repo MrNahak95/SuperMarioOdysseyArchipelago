@@ -1,0 +1,41 @@
+# Sample Super Mario Odyssey player YAML (MrNahak95 fork)
+# Copy into your Archipelago players folder, or merge the SMO block into a multiworld YAML.
+#
+# Requires this fork's `smo.apworld` in Archipelago `custom_worlds`
+# (e.g. C:\ProgramData\Archipelago\custom_worlds\smo.apworld).
+# After updating the apworld, regenerate templates / restart the Launcher so new
+# options appear in the weighted randomizer and template YAMLs.
+#
+# Full option reference: docs/PHASE_FEATURES.md and World/smo/Options.py
+
+name: Player1
+game: Super Mario Odyssey
+
+Super Mario Odyssey:
+  # --- Goal (Choice) ---
+  # Variants: sand | lake | metro | luncheon | moon | dark | darker
+  goal: moon
+
+  # --- Existing world options ---
+  story: off                    # off | single_moons | multi_moons | all
+  extra_moons: some             # none | some | more | many | double
+  shop_sanity: off              # off | shuffle | outfits | non_outfits | all
+  colors: off                   # off | kingdom_random | item | classification | item_random | classification_random | chaos
+  counts: off                   # off | same_total | same_total_lock_ruined | moderate | extreme
+  capture_sanity: false         # legacy; prefer capture_lock
+  death_link: false
+
+  # --- Project features (Phase B) — must be present in smo.apworld from this fork ---
+  # Capture Lock: capture items on Mushroom moons; gated until received
+  capture_lock: false           # true | false
+
+  # Ability Lock: actions on Dark Side moons/Starbits (not Moon Kingdom)
+  ability_lock: false           # true | false
+
+  # Paintings: Cloud moons unlock paintings; destinations shuffled
+  painting_unlock: false        # true | false
+
+  # Entrances
+  # Variants: off | standard | chains | limited | decoupled
+  # Implemented now: off, standard. chains/limited/decoupled currently = off.
+  entrance_mode: off

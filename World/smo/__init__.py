@@ -7,7 +7,7 @@ from .Items import item_table, SMOItem, filler_item_table, outfits, shop_items, 
     location_hint_list
 from .Locations import locations_table, SMOLocation, locations_list, post_game_locations_list, \
     special_locations_table, full_moon_locations_list, goals_table
-from .Options import SMOOptions
+from .Options import SMOOptions, smo_option_groups
 from .Rules import set_rules
 from .Regions import create_regions
 from .Abilities import ability_items, ability_item_table, ability_lock_starts
@@ -44,6 +44,7 @@ class SMOWorld(World):
 
     options_dataclass = SMOOptions
     options: SMOOptions
+    option_groups = smo_option_groups
 
     topology_present = True  # show path to required location checks in spoiler
 
@@ -233,6 +234,18 @@ class SMOWorld(World):
         self.capture_lock_placements = []
         self.ability_lock_placements = []
         self.painting_placements = []
+
+        # Reserved entrance modes fall back to vanilla until implemented.
+        if self.options.entrance_mode.value in (
+                self.options.entrance_mode.option_chains,
+                self.options.entrance_mode.option_limited,
+                self.options.entrance_mode.option_decoupled):
+            mode_key = getattr(self.options.entrance_mode, "current_key",
+                               str(self.options.entrance_mode.value))
+            print(
+                f"[SMO] Player {self.player}: entrance_mode={mode_key!r} "
+                f"is not implemented yet; using vanilla connections (same as off)."
+            )
 
         # Capture Lock: story-critical captures start so Cap→Moon is beatable before Mushroom.
         if self.options.capture_lock:

@@ -2,10 +2,18 @@ from dataclasses import dataclass
 
 from Options import Toggle, Choice, FreeText, PerGameCommonOptions, DeathLink
 
+try:
+    from Options import OptionGroup
+except ImportError:  # Archipelago builds without OptionGroup
+    OptionGroup = None
+
 
 class Goal(Choice):
-    """Sets the completion goal. This is the kingdom you must get the last story multi moon in to win the game.
-    Valid options: Metro (A Traditional Festival), Luncheon (Cookatiel Showdown), Moon (Beat the game), Dark (Arrival at Rabbit Ridge), Darker (A Long Journey's End)"""
+    """Sets the completion goal (last story multi-moon kingdom that wins the seed).
+
+    YAML values: sand | lake | metro | luncheon | moon | dark | darker
+    (Sand Kingdom multi-moon through Darker Side.)
+    """
     display_name = "Goal"
     option_sand = 2
     option_lake = 4
@@ -75,12 +83,14 @@ class CaptureSanity(Toggle):
     Kept so older YAMLs still generate. Enables in-game capture gating.
     """
     display_name = "Randomize Captures (legacy)"
+    default = False
     #visibility = 0b1101
 
 class CaptureLock(Toggle):
     """Capture Lock (smorando-style): captures unusable until their AP item is received.
     Capture items are placed on Mushroom Kingdom moons (1 moon = 1 capture; multi-moons = 3 slots).
     Story-critical captures are auto-started so Cap→Moon stays beatable before Mushroom.
+    YAML: capture_lock: true | false
     """
     display_name = "Capture Lock"
     default = False
@@ -89,6 +99,7 @@ class AbilityLock(Toggle):
     """Ability Lock: Mario actions (long jump, ground pound, …) are AP items.
     Full Manual AP / smorando action list. Placement on Dark Side moons / Starbits
     (not Moon Kingdom). A safe starter subset is auto-started; the rest are on Dark Side.
+    YAML: ability_lock: true | false
     """
     display_name = "Ability Lock"
     default = False
@@ -96,14 +107,20 @@ class AbilityLock(Toggle):
 class PaintingUnlock(Toggle):
     """Cloud moons grant painting unlock items; painting destinations are shuffled.
     Mapping is written to slot_data for the client/mod.
+    YAML: painting_unlock: true | false
     """
     display_name = "Painting Unlock + Destination Shuffle"
     default = False
 
 class EntranceMode(Choice):
     """Randomize kingdom loading-zone connections.
-    standard: couple shuffle of story hub exits (B4 v1).
-    chains / limited / decoupled: reserved for later (treated as off until implemented).
+
+    YAML values:
+      off        — vanilla connections (default)
+      standard   — B4 v1 couple shuffle of story hub exits (implemented)
+      chains     — reserved (currently treated as off)
+      limited    — reserved (currently treated as off)
+      decoupled  — reserved (currently treated as off)
     """
     display_name = "Entrance Mode"
     option_off = 0
@@ -167,3 +184,17 @@ class SMOOptions(PerGameCommonOptions):
     painting_unlock : PaintingUnlock
     entrance_mode : EntranceMode
     death_link : SMODeathLink
+
+
+# Surfaced in Archipelago's weighted / template UIs (when OptionGroup is available).
+smo_option_groups = []
+if OptionGroup is not None:
+    smo_option_groups = [
+        OptionGroup("Project Features", [
+            CaptureLock,
+            AbilityLock,
+            PaintingUnlock,
+            EntranceMode,
+            Goal,
+        ]),
+    ]
