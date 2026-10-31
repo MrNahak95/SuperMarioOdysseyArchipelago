@@ -187,6 +187,15 @@ class Client {
         static void addCaptureCheck(const char* capture);
         static bool hasCaptureCheck(const char* capture);
 
+        // B2 Ability Lock / B3 Painting Unlock
+        static void addAbility(int abilityIndex);
+        static bool hasAbility(int abilityIndex);
+        static bool getAbilityLockFlag() { return sInstance ? sInstance->abilityLock : false; }
+        static void addPaintingUnlock(int paintingIndex);
+        static bool hasPaintingUnlock(int paintingIndex);
+        static bool getPaintingUnlockFlag() { return sInstance ? sInstance->paintingUnlock : false; }
+        static int getEntranceMode() { return sInstance ? sInstance->entranceMode : 0; }
+
         static void setCheckIndex(int index);
         static int getCheckIndex() { return sInstance ? sInstance->checkIndex : 0; };
 
@@ -309,6 +318,9 @@ class Client {
         sead::SafeArray<int, 17> worldPayCounts;
         bool regionals = false;
         bool captures = false;
+        bool abilityLock = false;
+        bool paintingUnlock = false;
+        int entranceMode = 0; // 0=off 1=standard (B4)
         sead::SafeArray<int, 17> worldScenarios;
         bool dying = false;
         bool apDeath = false;
@@ -329,6 +341,11 @@ class Client {
         // List of 7 u8s for tracking which captures have been grabbed
         sead::SafeArray<u8, 7> collectedCaptures;
         sead::SafeArray<u8, 7> checkedCaptures;
+
+        // Ability Lock bitflags (21 abilities → 3 bytes)
+        sead::SafeArray<u8, 3> collectedAbilities;
+        // Painting unlock bitflags (15 paintings → 2 bytes)
+        sead::SafeArray<u8, 2> collectedPaintings;
 
         // Moon Text Replacement Handling
         Shine* recentShine = nullptr;

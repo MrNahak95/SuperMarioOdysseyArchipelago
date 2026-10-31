@@ -22,4 +22,8 @@ struct PACKED SlotData : Packet {
     ushort darker = 0;
     bool regionals = false;
     bool captures = false;
+    // Phase B flags (appended — keep order stable)
+    bool abilityLock = false;
+    bool paintingUnlock = false;
+    u8 entranceMode = 0; // 0=off, 1=standard, 2=chains, 3=limited, 4=decoupled
 };

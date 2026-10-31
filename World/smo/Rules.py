@@ -261,8 +261,8 @@ def set_rules(self, options : SMOOptions) -> None:
         self.multiworld.get_location("Darker Side - A Long Journey's End!", self.player).place_locked_item(self.create_item("Darker Side Multi-Moon"))
 
 
-    # Captures
-    if options.capture_sanity.value == options.capture_sanity.option_true:
+    # Captures (legacy Sanity location rules — Capture Lock uses region gates + starts)
+    if options.capture_sanity and not options.capture_lock:
         # Cascade Story
         set_rule(self.multiworld.get_location("Cascade Kingdom - Our First Power Moon", self.player),
                  lambda state: state.has("Chain Chomp", self.player))

@@ -41,6 +41,8 @@ class ItemType(Enum):
     Sticker = 3
     RegionalCoin = 4
     Capture = 5
+    Ability = 6
+    Painting = 7
 
 
 #region Check Packets
@@ -196,9 +198,12 @@ class SlotDataPacket:
     darker : ushort
     regionals : bool
     captures : bool
-    SIZE : short = 28
+    ability_lock : bool
+    painting_unlock : bool
+    entrance_mode : int
+    SIZE : short = 31
 
-    def __init__(self, packet_bytes : bytearray = None, cascade : int = None, sand : int = None, wooded : int = None, lake : int = None, lost : int = None, metro : int = None, seaside : int = None, snow : int = None, luncheon : int = None, ruined : int = None, bowser : int = None, dark : int = None, darker : int = None,  regionals : bool = None, captures : bool = None):
+    def __init__(self, packet_bytes : bytearray = None, cascade : int = None, sand : int = None, wooded : int = None, lake : int = None, lost : int = None, metro : int = None, seaside : int = None, snow : int = None, luncheon : int = None, ruined : int = None, bowser : int = None, dark : int = None, darker : int = None,  regionals : bool = None, captures : bool = None, ability_lock : bool = False, painting_unlock : bool = False, entrance_mode : int = 0):
         if packet_bytes:
             self.deserialize(packet_bytes)
         else:
@@ -217,6 +222,9 @@ class SlotDataPacket:
             self.darker = short(darker)
             self.regionals = regionals
             self.captures = captures
+            self.ability_lock = bool(ability_lock)
+            self.painting_unlock = bool(painting_unlock)
+            self.entrance_mode = int(entrance_mode)
 
     def serialize(self) -> bytearray:
         data : bytearray = bytearray()
@@ -248,6 +256,9 @@ class SlotDataPacket:
         data += int_value.to_bytes(2, "little")
         data += self.regionals.to_bytes(1, "little")
         data += self.captures.to_bytes(1, "little")
+        data += self.ability_lock.to_bytes(1, "little")
+        data += self.painting_unlock.to_bytes(1, "little")
+        data += int(self.entrance_mode).to_bytes(1, "little")
         if len(data) != self.SIZE:
             raise f"CountsPacket failed to serialize. bytearray is incorrect size {self.SIZE}."
         return data
@@ -285,6 +296,21 @@ class SlotDataPacket:
         self.regionals = bool.from_bytes(data[offset:offset + 1], "little")
         offset += 1
         self.captures = bool.from_bytes(data[offset:offset + 1], "little")
+        offset += 1
+        if offset < len(data):
+            self.ability_lock = bool.from_bytes(data[offset:offset + 1], "little")
+            offset += 1
+        else:
+            self.ability_lock = False
+        if offset < len(data):
+            self.painting_unlock = bool.from_bytes(data[offset:offset + 1], "little")
+            offset += 1
+        else:
+            self.painting_unlock = False
+        if offset < len(data):
+            self.entrance_mode = int.from_bytes(data[offset:offset + 1], "little")
+        else:
+            self.entrance_mode = 0
 
 
 
@@ -628,7 +654,10 @@ class Packet:
                     self.packet = SlotDataPacket(cascade=packet_data[0], sand=packet_data[1], wooded=packet_data[2],
                         lake=packet_data[3], lost =packet_data[4], metro=packet_data[5], seaside=packet_data[6],
                         snow=packet_data[7], luncheon=packet_data[8], ruined=packet_data[9], bowser=packet_data[10],
-                        dark=packet_data[11], darker=packet_data[12], regionals=packet_data[13], captures=packet_data[14])
+                        dark=packet_data[11], darker=packet_data[12], regionals=packet_data[13], captures=packet_data[14],
+                        ability_lock=packet_data[15] if len(packet_data) > 15 else False,
+                        painting_unlock=packet_data[16] if len(packet_data) > 16 else False,
+                        entrance_mode=packet_data[17] if len(packet_data) > 17 else 0)
                 case PacketType.ArchipelagoChat:
                     self.packet = ChatMessagePacket(messages=packet_data[0])
                 case PacketType.Check:

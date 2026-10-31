@@ -71,13 +71,47 @@ class RandomizeMoonCount(Choice):
     default = 0
 
 class CaptureSanity(Toggle):
-    """Randomizes Captures.
-    Warning this is an experimental feature!
-    NOT ALL Captures have logic, use at YOU OWN RISK!
-    Logic for post game is still missing.
+    """Legacy Capture Sanity (capture-as-check locations). Prefer Capture Lock.
+    Kept so older YAMLs still generate. Enables in-game capture gating.
     """
-    display_name = "Randomize Captures"
+    display_name = "Randomize Captures (legacy)"
     #visibility = 0b1101
+
+class CaptureLock(Toggle):
+    """Capture Lock (smorando-style): captures unusable until their AP item is received.
+    Capture items are placed on Mushroom Kingdom moons (1 moon = 1 capture; multi-moons = 3 slots).
+    Story-critical captures are auto-started so Cap→Moon stays beatable before Mushroom.
+    """
+    display_name = "Capture Lock"
+    default = False
+
+class AbilityLock(Toggle):
+    """Ability Lock: Mario actions (long jump, ground pound, …) are AP items.
+    Full Manual AP / smorando action list. Placement on Dark Side moons / Starbits
+    (not Moon Kingdom). A safe starter subset is auto-started; the rest are on Dark Side.
+    """
+    display_name = "Ability Lock"
+    default = False
+
+class PaintingUnlock(Toggle):
+    """Cloud moons grant painting unlock items; painting destinations are shuffled.
+    Mapping is written to slot_data for the client/mod.
+    """
+    display_name = "Painting Unlock + Destination Shuffle"
+    default = False
+
+class EntranceMode(Choice):
+    """Randomize kingdom loading-zone connections.
+    standard: couple shuffle of story hub exits (B4 v1).
+    chains / limited / decoupled: reserved for later (treated as off until implemented).
+    """
+    display_name = "Entrance Mode"
+    option_off = 0
+    option_standard = 1
+    option_chains = 2
+    option_limited = 3
+    option_decoupled = 4
+    default = 0
 
 class ExtraMoons(Choice):
     """
@@ -128,5 +162,8 @@ class SMOOptions(PerGameCommonOptions):
     colors : RandomizeMoonColors
     counts : RandomizeMoonCount
     capture_sanity : CaptureSanity
+    capture_lock : CaptureLock
+    ability_lock : AbilityLock
+    painting_unlock : PaintingUnlock
+    entrance_mode : EntranceMode
     death_link : SMODeathLink
-
