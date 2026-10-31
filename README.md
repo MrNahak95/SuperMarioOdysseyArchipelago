@@ -39,3 +39,14 @@ Credits
 - [Sanae](https://github.com/sanae6) Author of original server code
 - [CraftyBoss](https://github.com/CraftyBoss) Author of SMO Online
 - All other contributors to the aforementioned repos.
+
+---
+
+## This fork (SMO_ARCHIPELAGO / MrNahak95)
+
+Project work targets **emulator only** (Ryujinx / Yuzu-family), SMO **1.0.0**.
+
+- Install / rebuild: see [`docs/EMU.md`](docs/EMU.md)
+- Capture Lock, Ability Lock (Dark Side), Paintings, Entrances: see [`docs/PHASE_FEATURES.md`](docs/PHASE_FEATURES.md)
+- Upstream: [Kgamer77/SuperMarioOdysseyArchipelago](https://github.com/Kgamer77/SuperMarioOdysseyArchipelago)
+
