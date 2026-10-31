@@ -196,6 +196,20 @@ class Client {
         static bool getPaintingUnlockFlag() { return sInstance ? sInstance->paintingUnlock : false; }
         static int getEntranceMode() { return sInstance ? sInstance->entranceMode : 0; }
 
+        // Runtime maps (filled via ApInfo type 10/11/12)
+        static void setEntranceDest(int sourceKingdom, const char* destKingdomOrStage);
+        static const char* getEntranceDestStage(int sourceKingdom);
+        static void setPaintingDest(int paintingIndex, const char* stageName);
+        static void setPaintingDefault(int paintingIndex, const char* stageName);
+        static const char* getPaintingDest(int paintingIndex);
+        static const char* getPaintingDefault(int paintingIndex);
+        static int findPaintingByDefaultStage(const char* stageName);
+
+        // Remap a WorldHomeStage transition; returns nullptr to keep original.
+        static const char* remapEntranceStage(const char* fromStage, const char* toStage);
+        // Painting warp: returns remapped stage, or nullptr to cancel (locked), or toStage if N/A.
+        static const char* applyPaintingWarp(const char* toStage, bool* outCancel);
+
         static void setCheckIndex(int index);
         static int getCheckIndex() { return sInstance ? sInstance->checkIndex : 0; };
 
@@ -225,6 +239,9 @@ class Client {
 
         static void setStageInfo(GameDataHolderAccessor holder);
         static void sendStage(GameDataHolderWriter writer, const ChangeStageInfo* stageInfo);
+        static const StageScene* getCurStageScene() {
+            return sInstance ? sInstance->mCurStageScene : nullptr;
+        }
 
         static void setDying(bool value);
         static void setApDeath(bool value);
@@ -346,6 +363,12 @@ class Client {
         sead::SafeArray<u8, 3> collectedAbilities;
         // Painting unlock bitflags (15 paintings → 2 bytes)
         sead::SafeArray<u8, 2> collectedPaintings;
+
+        // Entrance remap: source kingdom index → destination stage name
+        sead::SafeArray<sead::FixedSafeString<0x30>, 12> entranceDestStages;
+        // Painting destination + vanilla default stage names
+        sead::SafeArray<sead::FixedSafeString<0x30>, 15> paintingDestStages;
+        sead::SafeArray<sead::FixedSafeString<0x30>, 15> paintingDefaultStages;
 
         // Moon Text Replacement Handling
         Shine* recentShine = nullptr;

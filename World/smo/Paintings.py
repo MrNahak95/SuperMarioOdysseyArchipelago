@@ -32,7 +32,7 @@ painting_default_destinations = {
     "Painting Snow": "SnowWorldHomeStage",
     "Painting Seaside": "SeaWorldHomeStage",
     "Painting Luncheon": "LavaWorldHomeStage",
-    "Painting Ruined": "DesertWorldHomeStage",
+    "Painting Ruined": "BossRaidWorldHomeStage",
     "Painting Bowser": "SkyWorldHomeStage",
     "Painting Moon": "MoonWorldHomeStage",
     "Painting Mushroom": "PeachWorldHomeStage",

@@ -170,7 +170,58 @@ class SMOContext(CommonContext):
                            self.slot_data.get("painting_unlock", False),
                            self.slot_data.get("entrance_mode", 0)]))
 
+        # B4 entrances — ApInfo type 10: index = source kingdom order, info = dest kingdom name
+        entrance_order = [
+            "Cascade", "Sand", "Lake", "Wooded", "Cloud", "Lost",
+            "Metro", "Snow", "Seaside", "Luncheon", "Ruined", "Bowser",
+        ]
+        entrances = self.slot_data.get("entrances") or {}
+        if entrances:
+            triples = []
+            for src in entrance_order:
+                dest = entrances.get(src, "")
+                triples.append((entrance_order.index(src), dest))
+            for i in range(0, len(triples), 3):
+                chunk = triples[i:i + 3]
+                idxs = [c[0] for c in chunk] + [-1] * (3 - len(chunk))
+                infos = [c[1] for c in chunk] + [""] * (3 - len(chunk))
+                self.proxy_msgs.append(Packet(
+                    guid=self.proxy_guid, packet_type=PacketType.ApInfo,
+                    packet_data=[10, idxs[0], idxs[1], idxs[2], infos]))
 
+        # B3 paintings — type 11 shuffled dest, type 12 vanilla default
+        painting_dests = self.slot_data.get("painting_destinations") or {}
+        painting_defaults = {
+            "Painting Cap": "CapWorldHomeStage",
+            "Painting Cascade": "WaterfallWorldHomeStage",
+            "Painting Sand": "SandWorldHomeStage",
+            "Painting Lake": "LakeWorldHomeStage",
+            "Painting Wooded": "ForestWorldHomeStage",
+            "Painting Lost": "ClashWorldHomeStage",
+            "Painting Metro": "CityWorldHomeStage",
+            "Painting Snow": "SnowWorldHomeStage",
+            "Painting Seaside": "SeaWorldHomeStage",
+            "Painting Luncheon": "LavaWorldHomeStage",
+            "Painting Ruined": "BossRaidWorldHomeStage",
+            "Painting Bowser": "SkyWorldHomeStage",
+            "Painting Moon": "MoonWorldHomeStage",
+            "Painting Mushroom": "PeachWorldHomeStage",
+            "Painting Cloud": "CloudWorldHomeStage",
+        }
+        # Prefer defaults from world module keys order
+        paint_keys = list(painting_defaults.keys())
+        if painting_dests or self.slot_data.get("painting_unlock"):
+            for info_type, mapping in ((12, painting_defaults), (11, painting_dests or painting_defaults)):
+                triples = []
+                for idx, key in enumerate(paint_keys):
+                    triples.append((idx, mapping.get(key, painting_defaults[key])))
+                for i in range(0, len(triples), 3):
+                    chunk = triples[i:i + 3]
+                    idxs = [c[0] for c in chunk] + [-1] * (3 - len(chunk))
+                    infos = [c[1] for c in chunk] + [""] * (3 - len(chunk))
+                    self.proxy_msgs.append(Packet(
+                        guid=self.proxy_guid, packet_type=PacketType.ApInfo,
+                        packet_data=[info_type, idxs[0], idxs[1], idxs[2], infos]))
 
         # Games
         for i in range(0, len(self.slot_data["shop_games"]), 3):

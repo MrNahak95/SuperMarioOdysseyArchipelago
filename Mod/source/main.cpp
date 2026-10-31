@@ -17,6 +17,8 @@
 #include "heap/seadHeap.h"
 #include "math/seadVector.h"
 #include "server/Client.hpp"
+#include "server/RuntimeMaps.hpp"
+#include "game/Player/PlayerAnimator.h"
 #include "puppets/PuppetInfo.h"
 #include "actors/PuppetActor.h"
 #include "al/LiveActor/LiveActor.h"
@@ -52,6 +54,18 @@ static bool isRecordCapture = false;
 static int updateCounterTimer = 0;
 
 void updatePlayerInfo(GameDataHolderAccessor holder, PlayerActorBase* playerBase, bool isYukimaru) {
+
+    // B2 — Ability Lock: cancel gated anims when the AP item is missing
+    if (!isYukimaru && Client::getAbilityLockFlag() && playerBase) {
+        PlayerActorHakoniwa* p1 = (PlayerActorHakoniwa*)playerBase;
+        if (p1->mPlayerAnimator) {
+            const char* anim = p1->mPlayerAnimator->curAnim.cstr();
+            int abi = abilityIndexForAnim(anim);
+            if (abi >= 0 && !Client::hasAbility(abi)) {
+                p1->mPlayerAnimator->startAnim("Wait");
+            }
+        }
+    }
     
     if (pInfSendTimer >= 3) {
 
@@ -671,32 +685,60 @@ void onGrandShineStageChange(GameDataHolderWriter holder, ChangeStageInfo const*
     Client::sendStage(holder, stageInfo);
 }
 
-void onStageChange(GameDataFile *file,const ChangeStageInfo* stageInfo, int param2)
-{
-    //Client::setMessage(1, stageInfo->changeStageId.cstr());
-    // Add Wooded shop moon warp
-    if (!(al::isEqualString(stageInfo->changeStageId.cstr(), "obj846") ||
-        al::isEqualString(stageInfo->changeStageId.cstr(), "obj1084"))) {
-        if (isPartOf(stageInfo->changeStageName.cstr(), "WorldHomeStage")) {
-            if (Client::setScenario(stageInfo->changeStageName.cstr(), stageInfo->scenarioNo)) {
-                //Client::setMessage(2, "attempting send to correct scenario");
-                Client::sendCorrectScenario(stageInfo);
-
+static void changeStageCommon(GameDataFile* file, const ChangeStageInfo* info, int param2) {
+    if (!(al::isEqualString(info->changeStageId.cstr(), "obj846") ||
+          al::isEqualString(info->changeStageId.cstr(), "obj1084"))) {
+        if (isPartOf(info->changeStageName.cstr(), "WorldHomeStage") ||
+            isPartOf(info->changeStageName.cstr(), "BossRaid")) {
+            if (Client::setScenario(info->changeStageName.cstr(), info->scenarioNo)) {
+                Client::sendCorrectScenario(info);
             } else {
-                //Client::setMessage(2, "setScenario false");
-                file->changeNextStage(stageInfo, param2);
+                file->changeNextStage(info, param2);
             }
         } else {
-            // Non world transitions
-            //Client::setMessage(2, "non world transition");
-            file->changeNextStage(stageInfo, param2);
+            file->changeNextStage(info, param2);
         }
     } else {
-        // Catch cap and cascade shop moons
-        //Client::setMessage(2, "Shop moon stageID caught");
-        file->changeNextStage(stageInfo, param2);
+        file->changeNextStage(info, param2);
     }
-    
+}
+
+void onStageChange(GameDataFile *file,const ChangeStageInfo* stageInfo, int param2)
+{
+    const char* destStage = stageInfo->changeStageName.cstr();
+    const char* fromStage = nullptr;
+
+    const StageScene* scene = Client::getCurStageScene();
+    if (scene) {
+        GameDataHolderAccessor accessor(scene);
+        fromStage = GameDataFunction::tryGetCurrentMainStageName(accessor);
+    }
+
+    // B3 — painting warp apply / lock
+    bool cancelPainting = false;
+    const char* painted = Client::applyPaintingWarp(destStage, &cancelPainting);
+    if (cancelPainting) {
+        return; // Locked painting: ignore the warp
+    }
+    if (painted)
+        destStage = painted;
+
+    // B4 — entrance remap for Standard mode
+    const char* remapped = Client::remapEntranceStage(fromStage, destStage);
+    if (remapped)
+        destStage = remapped;
+
+    bool destChanged = !al::isEqualString(destStage, stageInfo->changeStageName.cstr());
+
+    if (destChanged && scene) {
+        GameDataHolderAccessor accessor(scene);
+        ChangeStageInfo remappedInfo(
+            accessor.mData, stageInfo->changeStageId.cstr(), destStage, stageInfo->isReturn,
+            stageInfo->scenarioNo, stageInfo->subType);
+        changeStageCommon(file, &remappedInfo, param2);
+    } else {
+        changeStageCommon(file, stageInfo, param2);
+    }
 }
 
 void setShineLabel(al::IUseLayout* layout, const char* elementLabel)

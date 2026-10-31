@@ -1,4 +1,6 @@
 #include "server/Client.hpp"
+#include "server/RuntimeMaps.hpp"
+#include "helpers.hpp"
 #include "al/layout/SimpleLayoutAppearWaitEnd.h"
 #include "al/util/LiveActorUtil.h"
 #include "game/SaveData/SaveDataAccessFunction.h"
@@ -74,6 +76,12 @@ Client::Client() {
     abilityLock = false;
     paintingUnlock = false;
     entranceMode = 0;
+    for (int i = 0; i < 12; i++)
+        entranceDestStages[i] = "";
+    for (int i = 0; i < 15; i++) {
+        paintingDestStages[i] = "";
+        paintingDefaultStages[i] = "";
+    }
 
     shineTextReplacements.fill({0, 0});
     shineItemNames.fill(sead::FixedSafeString<40>());
@@ -2058,6 +2066,97 @@ bool Client::hasPaintingUnlock(int paintingIndex) {
     return (sInstance->collectedPaintings[paintingIndex / 8] & (u8)(1 << (paintingIndex % 8))) != 0;
 }
 
+void Client::setEntranceDest(int sourceKingdom, const char* destKingdomOrStage) {
+    if (!sInstance || sourceKingdom < 0 || sourceKingdom >= 12 || !destKingdomOrStage)
+        return;
+    // Accept kingdom name or full stage name
+    int destIdx = kingdomIndexForName(destKingdomOrStage);
+    const char* stage = destIdx >= 0 ? stageForKingdomIndex(destIdx) : destKingdomOrStage;
+    sInstance->entranceDestStages[sourceKingdom] = "";
+    sInstance->entranceDestStages[sourceKingdom].append(stage);
+}
+
+const char* Client::getEntranceDestStage(int sourceKingdom) {
+    if (!sInstance || sourceKingdom < 0 || sourceKingdom >= 12)
+        return nullptr;
+    if (sInstance->entranceDestStages[sourceKingdom].isEmpty())
+        return nullptr;
+    return sInstance->entranceDestStages[sourceKingdom].cstr();
+}
+
+void Client::setPaintingDest(int paintingIndex, const char* stageName) {
+    if (!sInstance || paintingIndex < 0 || paintingIndex >= 15 || !stageName)
+        return;
+    sInstance->paintingDestStages[paintingIndex] = "";
+    sInstance->paintingDestStages[paintingIndex].append(stageName);
+}
+
+void Client::setPaintingDefault(int paintingIndex, const char* stageName) {
+    if (!sInstance || paintingIndex < 0 || paintingIndex >= 15 || !stageName)
+        return;
+    sInstance->paintingDefaultStages[paintingIndex] = "";
+    sInstance->paintingDefaultStages[paintingIndex].append(stageName);
+}
+
+const char* Client::getPaintingDest(int paintingIndex) {
+    if (!sInstance || paintingIndex < 0 || paintingIndex >= 15)
+        return nullptr;
+    if (sInstance->paintingDestStages[paintingIndex].isEmpty())
+        return nullptr;
+    return sInstance->paintingDestStages[paintingIndex].cstr();
+}
+
+const char* Client::getPaintingDefault(int paintingIndex) {
+    if (!sInstance || paintingIndex < 0 || paintingIndex >= 15)
+        return nullptr;
+    if (sInstance->paintingDefaultStages[paintingIndex].isEmpty())
+        return nullptr;
+    return sInstance->paintingDefaultStages[paintingIndex].cstr();
+}
+
+int Client::findPaintingByDefaultStage(const char* stageName) {
+    if (!sInstance || !stageName)
+        return -1;
+    for (int i = 0; i < 15; i++) {
+        if (!sInstance->paintingDefaultStages[i].isEmpty() &&
+            al::isEqualString(sInstance->paintingDefaultStages[i].cstr(), stageName)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+const char* Client::remapEntranceStage(const char* fromStage, const char* toStage) {
+    if (!sInstance || sInstance->entranceMode != 1 || !fromStage || !toStage)
+        return nullptr;
+    if (!isPartOf(toStage, "WorldHomeStage") && !isPartOf(toStage, "BossRaid"))
+        return nullptr;
+    int fromIdx = kingdomIndexForStage(fromStage);
+    if (fromIdx < 0)
+        return nullptr;
+    const char* remapped = getEntranceDestStage(fromIdx);
+    if (!remapped || al::isEqualString(remapped, toStage))
+        return nullptr;
+    return remapped;
+}
+
+const char* Client::applyPaintingWarp(const char* toStage, bool* outCancel) {
+    if (outCancel)
+        *outCancel = false;
+    if (!sInstance || !sInstance->paintingUnlock || !toStage)
+        return toStage;
+    int paintIdx = findPaintingByDefaultStage(toStage);
+    if (paintIdx < 0)
+        return toStage;
+    if (!hasPaintingUnlock(paintIdx)) {
+        if (outCancel)
+            *outCancel = true;
+        return nullptr;
+    }
+    const char* dest = getPaintingDest(paintIdx);
+    return dest ? dest : toStage;
+}
+
 bool Client::hasCaptureCheck(const char* capture) {
     if (!sInstance) {
         Logger::log("Static Instance is Null!\n");
@@ -2262,6 +2361,30 @@ void Client::addApInfo(ApInfo* packet)
                 sInstance->shineItemNames[packet->index3].append(packet->info3);
             }
 
+        }
+        // type 10: entrance remap — index1 = source kingdom, info1 = dest kingdom/stage
+        else if (type == 10) {
+            setEntranceDest(packet->index1, packet->info1);
+            if (packet->index2 >= 0)
+                setEntranceDest(packet->index2, packet->info2);
+            if (packet->index3 >= 0)
+                setEntranceDest(packet->index3, packet->info3);
+        }
+        // type 11: painting shuffled destination — index = painting id, info = stage
+        else if (type == 11) {
+            setPaintingDest(packet->index1, packet->info1);
+            if (packet->index2 >= 0)
+                setPaintingDest(packet->index2, packet->info2);
+            if (packet->index3 >= 0)
+                setPaintingDest(packet->index3, packet->info3);
+        }
+        // type 12: painting vanilla default destination
+        else if (type == 12) {
+            setPaintingDefault(packet->index1, packet->info1);
+            if (packet->index2 >= 0)
+                setPaintingDefault(packet->index2, packet->info2);
+            if (packet->index3 >= 0)
+                setPaintingDefault(packet->index3, packet->info3);
         }
     }
 
