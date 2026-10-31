@@ -69,6 +69,11 @@ Client::Client() {
     collectedSouvenirs.fill(0);
     collectedCaptures.fill(0);
     checkedCaptures.fill(0);
+    collectedAbilities.fill(0);
+    collectedPaintings.fill(0);
+    abilityLock = false;
+    paintingUnlock = false;
+    entranceMode = 0;
 
     shineTextReplacements.fill({0, 0});
     shineItemNames.fill(sead::FixedSafeString<40>());
@@ -1464,6 +1469,12 @@ void Client::receiveCheck(Check* packet)
         addCapture(captureListNames[packet->locationId]);
         GameDataFunction::addHackDictionary(accessor, captureListNames[packet->locationId]);
         break;
+    case 6: // Ability Lock (B2) — locationId is ability index 0..N
+        addAbility(packet->locationId);
+        break;
+    case 7: // Painting unlock (B3) — locationId is painting index
+        addPaintingUnlock(packet->locationId);
+        break;
     }
 
     if (updateIndex) {
@@ -2017,6 +2028,34 @@ void Client::addCaptureCheck(const char* capture) {
     }
 
     sInstance->checkedCaptures[index / 8] = checkedCaptures;
+}
+
+void Client::addAbility(int abilityIndex) {
+    if (!sInstance || abilityIndex < 0 || abilityIndex >= 24)
+        return;
+    sInstance->collectedAbilities[abilityIndex / 8] |= (u8)(1 << (abilityIndex % 8));
+}
+
+bool Client::hasAbility(int abilityIndex) {
+    if (!sInstance || abilityIndex < 0 || abilityIndex >= 24)
+        return false;
+    if (!sInstance->abilityLock)
+        return true;
+    return (sInstance->collectedAbilities[abilityIndex / 8] & (u8)(1 << (abilityIndex % 8))) != 0;
+}
+
+void Client::addPaintingUnlock(int paintingIndex) {
+    if (!sInstance || paintingIndex < 0 || paintingIndex >= 16)
+        return;
+    sInstance->collectedPaintings[paintingIndex / 8] |= (u8)(1 << (paintingIndex % 8));
+}
+
+bool Client::hasPaintingUnlock(int paintingIndex) {
+    if (!sInstance || paintingIndex < 0 || paintingIndex >= 16)
+        return false;
+    if (!sInstance->paintingUnlock)
+        return true;
+    return (sInstance->collectedPaintings[paintingIndex / 8] & (u8)(1 << (paintingIndex % 8))) != 0;
 }
 
 bool Client::hasCaptureCheck(const char* capture) {
@@ -3351,6 +3390,9 @@ void Client::updateSlotData(SlotData* packet) {
     sInstance->worldPayCounts[16] = packet->darker;
     sInstance->regionals = packet->regionals;
     sInstance->captures = packet->captures;
+    sInstance->abilityLock = packet->abilityLock;
+    sInstance->paintingUnlock = packet->paintingUnlock;
+    sInstance->entranceMode = packet->entranceMode;
 
     sInstance->numApGames = 0;
     sInstance->numApSlots = 0;

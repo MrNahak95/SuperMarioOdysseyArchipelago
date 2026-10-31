@@ -1,5 +1,7 @@
 from BaseClasses import Item, ItemClassification
 from .Locations import shop_locations_table, loc_Post_Cloud, loc_Moon_Post_Moon, loc_Captures
+from .Abilities import ability_item_table
+from .Paintings import painting_item_table
 
 
 class SMOItem(Item):
@@ -1200,6 +1202,8 @@ location_hint_list = [
 item_table = {
     **moon_item_table,
     **loc_Captures,
+    **ability_item_table,
+    **painting_item_table,
     # **world_items_table,
     **flag_items,
     **filler_item_table

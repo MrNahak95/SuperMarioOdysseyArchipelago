@@ -26,6 +26,9 @@ from .Locations import SMOLocation, loc_Cap, loc_Cascade, loc_Cascade_Revisit, \
     loc_Cascade_Full, loc_Sand_Full
 
 from .Logic import count_moons, total_moons
+from .LockPlacement import (
+    capture_lock_slot_locations, ability_lock_slot_locations, painting_lock_slot_locations,
+)
 
 class SMORegion(Region):
     subregions: typing.List[Region] = []
@@ -229,7 +232,9 @@ def create_regions(self, world, player):
 
     # Moon
     regMoon = Region("Moon", player, world, "Moon Kingdom")
-    if self.options.goal > self.options.goal.option_moon or self.options.capture_sanity.value == self.options.capture_sanity.option_true:
+    if (self.options.goal > self.options.goal.option_moon
+            or self.options.capture_sanity
+            or self.options.capture_lock):
         create_locs(regMoon, *loc_Moon.keys())
     world.regions.append(regMoon)
     regMoonOutfit = Region("Moon Gift Outfit", player, world, "Moon Gift Outfit")
@@ -239,14 +244,25 @@ def create_regions(self, world, player):
 
     # Post Game
     regPostGame = Region("Post Game", player, world, "Post Game Moons")
-    if self.options.goal > self.options.goal.option_moon:
+    if self.options.goal > self.options.goal.option_moon or self.options.capture_lock or self.options.painting_unlock:
         create_locs(regPostGame, *post_game_locations_table.keys(), locs_table= post_game_locations_table)
+        # B1: multi-moon Capture Unlock Slot 2/3 under Post Game / Mushroom
+        if self.options.capture_lock:
+            create_locs(regPostGame, *capture_lock_slot_locations().keys(),
+                        locs_table=capture_lock_slot_locations())
+        if self.options.painting_unlock:
+            create_locs(regPostGame, *painting_lock_slot_locations().keys(),
+                        locs_table=painting_lock_slot_locations())
     world.regions.append(regPostGame)
 
     # Dark Side
     regDark = Region("Dark", player, world, "Dark Side")
-    if self.options.goal > self.options.goal.option_moon:
+    if self.options.goal > self.options.goal.option_moon or self.options.ability_lock:
         create_locs(regDark, *loc_Dark.keys(),  locs_table=special_locations_table)
+        # B2: multi-moon Ability Unlock Slot 2/3 on Dark Side
+        if self.options.ability_lock:
+            create_locs(regDark, *ability_lock_slot_locations().keys(),
+                        locs_table=ability_lock_slot_locations())
     world.regions.append(regDark)
 
     # Darker Side
@@ -396,7 +412,8 @@ def create_regions(self, world, player):
     regMoonCaveCaptures = Region("Moon Cave Captures", player, world, "Captures")
     regMushroomCaptures = Region("Mushroom Captures", player, world, "Captures")
 
-    if self.options.capture_sanity.value == self.options.capture_sanity.option_true:
+    # Capture-as-check locations (legacy Capture Sanity only — not Capture Lock)
+    if self.options.capture_sanity and not self.options.capture_lock:
         create_locs(regCapCaptures, *loc_Cap_Captures)
         create_locs(regCapRevisitCaptures, *loc_Cap_Captures_Revisit)
         create_locs(regCascadeCaptures, *loc_Cascade_Captures)
@@ -455,7 +472,8 @@ def create_regions(self, world, player):
         world.regions.append(regWoodedPostGameCaptures)
         world.regions.append(regMetroPostGameCaptures)
 
-    # Progression Connections
+    # Progression connections gated by capture items (Capture Sanity or Capture Lock)
+    if self.options.capture_sanity or self.options.capture_lock:
         regCascade.connect(regCascadePeace, "Menu", lambda state: state.has("Broode's Chain Chomp", player) and (state.has("Big Chain Chomp", self.player) or state.has("T-Rex", self.player)))
         regSandUnderground.connect(regSandPeace, "Sand World Peace",
             lambda state: state.has("Bullet Bill", self.player) and state.has("Knucklotec's Fist", self.player))
@@ -549,7 +567,7 @@ def create_regions(self, world, player):
     regPostGame.connect(regDark, "Dark Access", lambda state: total_moons(self, state, player) >= self.moon_counts["dark"])
     regPostGame.connect(regDarker, "Darker Access", lambda state: total_moons(self, state, player) >= self.moon_counts["darker"])
 
-    if self.options.capture_sanity.value == self.options.capture_sanity.option_true:
+    if self.options.capture_sanity or self.options.capture_lock:
         regMetro.connect(regMetroShop, "Metro Shop", lambda state: state.has("Spark Pylon", player)
                          and state.has("Sherm", player))
 

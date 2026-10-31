@@ -162,7 +162,13 @@ class SMOContext(CommonContext):
                            self.slot_data["counts"]["ruined"],
                            self.slot_data["counts"]["bowser"], self.slot_data["counts"]["dark"],
                            self.slot_data["counts"]["darker"],
-                           self.slot_data["regionals"], self.slot_data["capture_sanity"]]))
+                           self.slot_data["regionals"],
+                           self.slot_data.get("captures_gated",
+                                             self.slot_data.get("capture_sanity",
+                                                                self.slot_data.get("capture_lock", False))),
+                           self.slot_data.get("ability_lock", False),
+                           self.slot_data.get("painting_unlock", False),
+                           self.slot_data.get("entrance_mode", 0)]))
 
 
 
@@ -390,6 +396,14 @@ class SMOContext(CommonContext):
                         case 5:
                             packet = Packet(guid=self.proxy_guid, packet_type=PacketType.Check,
                                             packet_data=[net_item.item - 3701, ItemType.Capture, index, "", "", 0])
+                        # Abilities (B2) — mod tracks bitflags by ability index
+                        case 6:
+                            packet = Packet(guid=self.proxy_guid, packet_type=PacketType.Check,
+                                            packet_data=[net_item.item - 3800, ItemType.Ability, index, "", "", 0])
+                        # Painting unlocks (B3)
+                        case 7:
+                            packet = Packet(guid=self.proxy_guid, packet_type=PacketType.Check,
+                                            packet_data=[net_item.item - 3900, ItemType.Painting, index, "", "", 0])
                         # Filler
                         case -2:
                             if str(net_item.location) in self.slot_data["coin_values"][str(net_item.player)]:

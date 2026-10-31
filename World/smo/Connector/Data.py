@@ -2943,8 +2943,15 @@ def get_item_type(item : int) -> int:
     # Moons
     if item < 2500:
         return -1
-    elif 3700 < item < 9000:
+    # Captures 3701-3799
+    elif 3700 < item < 3800:
         return 5
+    # Abilities 3800-3899
+    elif 3800 <= item < 3900:
+        return 6
+    # Painting unlocks 3900-3999
+    elif 3900 <= item < 4000:
+        return 7
     elif 2599 > item > 2581:
         return 3
     elif 2625 > item > 2598:
@@ -2961,6 +2968,5 @@ def get_item_type(item : int) -> int:
     # Regional Coin
     else:
         return 4
-    # Add Capture
 
 

@@ -10,6 +10,14 @@ from .Locations import locations_table, SMOLocation, locations_list, post_game_l
 from .Options import SMOOptions
 from .Rules import set_rules
 from .Regions import create_regions
+from .Abilities import ability_items, ability_item_table, ability_lock_starts
+from .Paintings import painting_ids, painting_item_table, painting_default_destinations
+from .Entrances import shuffle_entrances_standard, VANILLA_ENTRANCES
+from .LockPlacement import (
+    capture_lock_slot_locations, ability_lock_slot_locations, painting_lock_slot_locations,
+    mushroom_moon_names, dark_side_moon_names, cloud_moon_names, placement_targets,
+    capture_lock_starts_for_goal, ability_items_to_place, shuffle_place_locked,
+)
 from BaseClasses import Item, ItemClassification
 from worlds.AutoWorld import World
 from worlds.LauncherComponents import (Component, components, Type as component_type, SuffixIdentifier, launch as launch_component)
@@ -47,7 +55,13 @@ class SMOWorld(World):
     # include events, but don't have to since events will be placed manually.
     item_name_to_id = {**item_table, **moon_types}
 
-    location_name_to_id = locations_table
+    location_name_to_id = {
+        **locations_table,
+        **capture_lock_slot_locations(),
+        **ability_lock_slot_locations(),
+        **painting_lock_slot_locations(),
+    }
+
     # Number of Power Moons required to leave each kingdom
     moon_counts = {
         "cascade": 5,
@@ -173,13 +187,32 @@ class SMOWorld(World):
     shop_replace_data = {}
     coin_values = {}
 
+    def captures_gated(self) -> bool:
+        """True when in-game capture gating should be enabled (Lock or legacy Sanity)."""
+        return bool(self.options.capture_lock) or bool(self.options.capture_sanity)
+
     # Change regionals to be dependent on the option
     def fill_slot_data(self) -> Mapping[str, Any]:
-        return {**(self.options.as_dict("goal", "colors", "capture_sanity", "death_link")), "counts" : self.moon_counts,
-                "shine_items" : self.shine_items, "shine_replace_data" : self.shine_replace_data, "shine_colors" : self.shine_colors,
-                "shop_games" : self.shop_games, "shop_players" : self.shop_players, "shop_ap_items" : self.shop_ap_items,
-                "shop_replace_data" : self.shop_replace_data, "coin_values" : self.coin_values,
-                "regionals" : False}
+        data = {
+            **(self.options.as_dict(
+                "goal", "colors", "capture_sanity", "capture_lock", "ability_lock",
+                "painting_unlock", "entrance_mode", "death_link")),
+            "counts": self.moon_counts,
+            "shine_items": self.shine_items,
+            "shine_replace_data": self.shine_replace_data,
+            "shine_colors": self.shine_colors,
+            "shop_games": self.shop_games,
+            "shop_players": self.shop_players,
+            "shop_ap_items": self.shop_ap_items,
+            "shop_replace_data": self.shop_replace_data,
+            "coin_values": self.coin_values,
+            "regionals": False,
+            # Mod SlotData still reads a single captures bool
+            "captures_gated": self.captures_gated(),
+            "entrances": self.entrance_map,
+            "painting_destinations": self.painting_destinations,
+        }
+        return data
 
     def create_regions(self):
         # Check if this is Universal Tracker generation using existing slot data
@@ -194,14 +227,21 @@ class SMOWorld(World):
         create_regions(self, self.multiworld, self.player)
 
     def generate_early(self):
-        pass
-        # self.multiworld.early_items[self.player]["Cascade Multi-Moon"] = 1
-        # self.multiworld.early_items[self.player]["Cascade Story Moon"] = 1
-        # self.multiworld.early_items[self.player]["Cascade Power Moon"] = self.moon_counts["cascade"]-4
-        # if self.options.capture_sanity.value == self.options.capture_sanity.option_true:
-        #     self.multiworld.early_items[self.player]["Broode's Chain Chomp"] = 1
-        #     self.multiworld.early_items[self.player]["Chain Chomp"] = 1
-        #     self.multiworld.early_items[self.player]["T-Rex"] = 1
+        # Per-player generation state (avoid class-level sharing in multi-SMO)
+        self.entrance_map = {}
+        self.painting_destinations = {}
+        self.capture_lock_placements = []
+        self.ability_lock_placements = []
+        self.painting_placements = []
+
+        # Capture Lock: story-critical captures start so Cap→Moon is beatable before Mushroom.
+        if self.options.capture_lock:
+            for name in capture_lock_starts_for_goal(self.options.goal.value):
+                self.multiworld.push_precollected(self.create_item(name))
+        # Ability Lock: safe starter subset (rest on Dark Side).
+        if self.options.ability_lock:
+            for name in ability_lock_starts:
+                self.multiworld.push_precollected(self.create_item(name))
 
     def generate_basic(self) -> None:
         pass
@@ -229,6 +269,10 @@ class SMOWorld(World):
                     classification = ItemClassification.progression
                 else:
                     classification = ItemClassification.filler
+            elif name in ability_items:
+                classification = ItemClassification.progression
+            elif name in painting_ids:
+                classification = ItemClassification.progression
             elif name in moon_types:
                 classification = ItemClassification.progression
 
@@ -261,6 +305,53 @@ class SMOWorld(World):
             else:
                 locations += [location.name]
         #print(locations)
+
+        # --- Phase B locks: place before moon pool so counts stay balanced ---
+        if self.options.capture_lock:
+            started = set(capture_lock_starts_for_goal(self.options.goal.value))
+            to_place = [c for c in capture_items if c not in started]
+            targets = placement_targets(
+                mushroom_moon_names(), capture_lock_slot_locations())
+            usable = [n for n in targets
+                      if n in self.location_name_to_id
+                      and self.get_location(n).item is None]
+            self.capture_lock_placements = shuffle_place_locked(
+                self, self.player, usable, to_place, random)
+
+        if self.options.ability_lock:
+            to_place = ability_items_to_place()
+            targets = placement_targets(
+                dark_side_moon_names(), ability_lock_slot_locations())
+            usable = [n for n in targets
+                      if n in self.location_name_to_id
+                      and self.get_location(n).item is None]
+            self.ability_lock_placements = shuffle_place_locked(
+                self, self.player, usable, to_place, random)
+
+        leftover_paintings = []
+        if self.options.painting_unlock:
+            targets = placement_targets(
+                cloud_moon_names(), painting_lock_slot_locations())
+            usable = [n for n in targets
+                      if n in self.location_name_to_id
+                      and self.get_location(n).item is None]
+            paintings = painting_ids[:]
+            random.shuffle(paintings)
+            place_n = min(len(paintings), len(usable))
+            self.painting_placements = shuffle_place_locked(
+                self, self.player, usable, paintings[:place_n], random)
+            leftover_paintings = paintings[place_n:]
+            keys = list(painting_default_destinations.keys())
+            values = list(painting_default_destinations.values())
+            random.shuffle(values)
+            self.painting_destinations = {keys[i]: values[i] for i in range(len(keys))}
+        else:
+            self.painting_destinations = dict(painting_default_destinations)
+
+        if self.options.entrance_mode == self.options.entrance_mode.option_standard:
+            self.entrance_map = shuffle_entrances_standard(random)
+        else:
+            self.entrance_map = {a: b for a, b in VANILLA_ENTRANCES}
 
         placement_counts = [
             0,
@@ -317,6 +408,9 @@ class SMOWorld(World):
                     kingdoms.remove(index)
 
         for location in locations:
+            # Skip locations already filled by Capture/Ability/Painting Lock
+            if self.get_location(location).item is not None:
+                continue
             # found : bool = False
             for index in range(len(world_list)):
                 if location in full_moon_locations_list[index]:
@@ -403,21 +497,25 @@ class SMOWorld(World):
                 item = item_names.pop(random.randint(0, len(item_names) - 1))
                 self.get_location(item).place_locked_item(self.create_item(item))
 
-        # Captures
-        locations: list = []
-        for location in self.get_locations():
-            if location.name in capture_items:
-                locations += [location.name]
+        # Overflow painting unlocks (more paintings than Cloud moons) enter the pool
+        for name in leftover_paintings:
+            pool.append(name)
 
-        if self.options.capture_sanity.value == self.options.capture_sanity.option_true:
+        # Captures — legacy Capture Sanity (capture-as-check locations)
+        if self.options.capture_sanity and not self.options.capture_lock:
+            locations: list = []
+            for location in self.get_locations():
+                if location.name in capture_items:
+                    locations += [location.name]
             for location in locations:
-                if location in capture_items and not location in self.multiworld.early_items[self.player]:
+                if location in capture_items and location not in self.multiworld.early_items[self.player]:
                     pool.append(location)
 
         # Remove start_inventory items from pool
         for start_item in self.options.start_inventory:
             for num in range(self.options.start_inventory[start_item]):
-                pool.remove(start_item)
+                if start_item in pool:
+                    pool.remove(start_item)
 
         #print(len(pool), len(list(self.multiworld.get_unfilled_locations(self.player))))
         if len(pool) < len(list(self.multiworld.get_unfilled_locations(self.player))):
@@ -678,6 +776,16 @@ class SMOWorld(World):
                 if world_list.index(key.capitalize()) <= self.options.goal:
                     text += f"\n{'':33}{(key.capitalize() + (' Kingdom: ' if world_list.index(key.capitalize()) < self.options.goal.option_dark else ' Side: '))}{str(self.moon_counts[key])}"
             spoiler_handle.write(text)
+        if self.options.entrance_mode == self.options.entrance_mode.option_standard and self.entrance_map:
+            text = "\nEntrance Mapping (Standard):\n"
+            for src, dst in self.entrance_map.items():
+                text += f"  {src} -> {dst}\n"
+            spoiler_handle.write(text)
+        if self.options.painting_unlock and self.painting_destinations:
+            text = "\nPainting Destinations:\n"
+            for painting, stage in self.painting_destinations.items():
+                text += f"  {painting} -> {stage}\n"
+            spoiler_handle.write(text)
 
     def generate_output(self, output_directory: str):
         pass
@@ -697,7 +805,13 @@ class SMOWorld(World):
         # Parse game options
         relevant_data["Goal"] = slot_data["goal"]
         relevant_data["Colors"] = slot_data["colors"]
-        relevant_data["CaptureSanity"] = slot_data["capture_sanity"]
+        relevant_data["CaptureSanity"] = slot_data.get("capture_sanity", False)
+        relevant_data["CaptureLock"] = slot_data.get("capture_lock", False)
+        relevant_data["AbilityLock"] = slot_data.get("ability_lock", False)
+        relevant_data["PaintingUnlock"] = slot_data.get("painting_unlock", False)
+        relevant_data["EntranceMode"] = slot_data.get("entrance_mode", 0)
+        relevant_data["Entrances"] = slot_data.get("entrances", {})
+        relevant_data["PaintingDestinations"] = slot_data.get("painting_destinations", {})
         
         # Parse shine data structures (for hint system)
         relevant_data["ShineItems"] = slot_data["shine_items"]
